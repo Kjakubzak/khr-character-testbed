@@ -49,6 +49,8 @@ export class KHRNodeCameraHintLoaderPlugin implements GLTFLoaderPlugin {
       }
 
       const targetNode = await this._getTargetNode(extension.targetNode, index, json);
+      const projection = extension.camera == null ? undefined
+        : await this.parser.getDependency('camera', extension.camera) as THREE.Camera;
 
       const node = await this.parser.getDependency('node', index) as THREE.Object3D | undefined;
       if (!node) {
@@ -61,6 +63,7 @@ export class KHRNodeCameraHintLoaderPlugin implements GLTFLoaderPlugin {
         role: extension.role,
         label: typeof extension.label === 'string' ? extension.label : undefined,
         targetNode,
+        projection,
       });
     }
 

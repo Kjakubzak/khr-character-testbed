@@ -10,7 +10,8 @@ import type { HumanoidHumanBoneName, VRMCVRM } from '@pixiv/types-vrmc-vrm-1.0';
  * In KHR_character, eye rotations and jaw movements are took place in the expression system,
  * so setting eye bones and the jaw bone in the skeletal rig mapping may conflict with
  * the expression system and cause issues.
- * To avoid this, we skip setting eye bones and the jaw bone in the `vrmHumanoid` mapping.
+ * This converter's retargeting policy omits eyes and jaw from `vrm1_humanoid`.
+ * The extension permits these associations and shared expression targets.
  */
 const vrmBonesToSkip: Set<HumanoidHumanBoneName> = new Set([
   'leftEye',
@@ -26,7 +27,7 @@ export function appendKHRCharacterSkeleton(gltf: GLTF.IGLTF): void {
   }
 
   const nodes = gltf.nodes;
-  const mappingName = 'vrmHumanoid';
+  const mappingName = 'vrm1_humanoid';
   const mapping: KHRCharacterSkeletonMappingSkeletalRigMapping = {};
 
   logVerbose(

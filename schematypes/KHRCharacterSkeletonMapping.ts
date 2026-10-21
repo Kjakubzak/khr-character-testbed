@@ -10,7 +10,7 @@ export interface KHRCharacterSkeletonMappingJointAssociation extends GLTFPropert
   node: number;
 
   /**
-   * The name of the source joint node.
+   * Optional name of this association, independent of the referenced node's name.
    */
   name?: string;
 }

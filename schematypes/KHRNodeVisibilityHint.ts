@@ -1,7 +1,9 @@
 import type { GLTFProperty } from './GLTFProperty.ts';
 
 /**
- * Annotates a node (and, by inheritance, its subtree) with a visibility role for view contexts such as first-person or third-person. Advisory: the runtime resolves visibility from the active view context according to the role's semantics and applies the result through KHR_node_visibility semantics.
+ * Adds a local view predicate for this node and its subtree. Effective hint
+ * visibility ANDs every ancestor predicate. Hint rendering does not rewrite
+ * actual KHR_node_visibility, animation, or hierarchy activation state.
  */
 export interface KHRNodeVisibilityHint extends GLTFProperty {
   /**

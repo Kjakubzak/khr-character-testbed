@@ -108,7 +108,7 @@ function isTextureChannelTarget(target: GLTFSchema.IAnimationChannelTarget): boo
 /**
  * Validate that declared KHR_character_expression channel indices point to matching animation targets.
  *
- * This intentionally only emits warnings. Runtime expression application is still driven by the animation clip created by GLTFLoader.
+ * This diagnostic helper only emits warnings. The loader resolves supported classified channels independently, and the manager samples decoded response channels without mutating ordinary clips.
  *
  * @param expressionDef - The expression definition to validate.
  * @param json - The source GLTF JSON containing animation channel targets.
@@ -119,14 +119,14 @@ export function validateKHRCharacterExpressionChannelTargets(
 ): void {
   const animation = json.animations?.[expressionDef.animation];
   if (animation == null) {
-    console.error(`Unreachable. Expression "${expressionDef.expression}" references missing animation #${expressionDef.animation}. This should have been caught during expression loading.`);
+    console.error(`Unreachable. Expression "${expressionDef.name}" references missing animation #${expressionDef.animation}. This should have been caught during expression loading.`);
     return;
   }
 
   const extensionsToValidate = [
     ['joint', 'KHR_character_expression_joint', isJointChannelTarget],
     ['morphtarget', 'KHR_character_expression_morphtarget', isMorphtargetChannelTarget],
-    ['texture', 'KHR_character_expression_texture', isTextureChannelTarget],
+    ['texture', 'KHR_character_expression_texture_transform', isTextureChannelTarget],
   ] as const;
 
   for (const [targetKind, extensionName, isValidTarget] of extensionsToValidate) {
@@ -140,7 +140,7 @@ export function validateKHRCharacterExpressionChannelTargets(
     for (const channelIndex of channels) {
       const channel = animation.channels[channelIndex];
       if (channel == null) {
-        console.warn(`${extensionName} on expression "${expressionDef.expression}" references missing animation channel #${channelIndex}.`);
+        console.warn(`${extensionName} on expression "${expressionDef.name}" references missing animation channel #${channelIndex}.`);
         continue;
       }
 
@@ -149,11 +149,11 @@ export function validateKHRCharacterExpressionChannelTargets(
 
         if (pointer == null) {
           console.warn(
-            `${extensionName} on expression "${expressionDef.expression}" references animation channel #${channelIndex}, but its target path "${channel.target.path}" is not a ${targetKind} target.`,
+            `${extensionName} on expression "${expressionDef.name}" references animation channel #${channelIndex}, but its target path "${channel.target.path}" is not a ${targetKind} target.`,
           );
         } else {
           console.warn(
-            `${extensionName} on expression "${expressionDef.expression}" references animation channel #${channelIndex}, but its target path "${channel.target.path}" with pointer "${pointer}" is not a ${targetKind} target.`,
+            `${extensionName} on expression "${expressionDef.name}" references animation channel #${channelIndex}, but its target path "${channel.target.path}" with pointer "${pointer}" is not a ${targetKind} target.`,
           );
         }
       }
