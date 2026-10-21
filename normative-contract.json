@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/Kjakubzak/glTF-private",
+  "branch": "avatar_ext_normative",
+  "commit": "9dc0781cebd1a24a0869aa98d2a3b902754ecd92",
+  "updated": "2026-10-21",
+  "historicalSpecificationSubmodule": "specification/glTF",
+  "identifiers": {
+    "skeletalRig": "vrm1_humanoid",
+    "expressionSet": "vrm1_expressions"
+  },
+  "expressionMapping": "expressionSetMappings: external input -> native expression index"
+}

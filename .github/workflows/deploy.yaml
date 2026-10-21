@@ -1,6 +1,9 @@
 name: Deploy
 
-on: push
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 defaults:
   run:
@@ -24,6 +27,9 @@ jobs:
       - name: Build
         working-directory: ./viewer
         run: npm run build
+      - name: Test
+        working-directory: ./viewer
+        run: npm test
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -47,16 +53,58 @@ jobs:
       - name: Build
         working-directory: ./converter
         run: npm run build
+      - name: Check types and test
+        working-directory: ./converter
+        run: |
+          npm run check
+          npm test
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: converter-dist
           path: ./converter/dist
 
+  browser-test:
+    needs: [build-viewer, build-converter]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: 'npm'
+          cache-dependency-path: |
+            viewer/package-lock.json
+            converter/package-lock.json
+      - name: Fetch browser and converter dependencies
+        run: |
+          npm ci --prefix viewer
+          npm ci --prefix converter
+      - name: Install Chromium and system libraries
+        working-directory: ./viewer
+        run: npx playwright install --with-deps chromium
+      - name: Test actual rendered GLB and converter worker UI
+        working-directory: ./viewer
+        run: |
+          npm run test:browser:preflight
+          npm run test:browser
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          path: |
+            viewer/browser-report
+            viewer/browser-results
+
   gh-pages:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - build-viewer
       - build-converter
+      - browser-test
     runs-on: ubuntu-latest
     permissions:
       pages: write

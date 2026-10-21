@@ -113,7 +113,7 @@ function createValidatedVRMHumanoidBoneNodeMap(
 export function createKHRCharacterVRMHumanoidRestPose(
   skeletonMapping: KHRCharacterSkeletonMapping,
 ): KHRCharacterVRMHumanoidRestPose | null {
-  const vrmHumanoidMapping = skeletonMapping.skeletalRigMappings.get('vrmHumanoid');
+  const vrmHumanoidMapping = skeletonMapping.skeletalRigMappings.get('vrm1_humanoid');
   if (vrmHumanoidMapping == null) {
     return null;
   }

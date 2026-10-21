@@ -58,28 +58,26 @@ export class KHRNodeVisibilityHintLoaderPlugin
 
     const items: KHRNodeVisibilityHintItem[] = [];
 
-    const visit = (object: THREE.Object3D, inheritedHint: ParsedVisibilityHint): void => {
+    const visit = (object: THREE.Object3D): void => {
       const reference = this.parser.associations.get(object) as GLTFNodeReference | undefined;
       const ownHint = reference?.nodes != null ? hints[reference.nodes] : undefined;
-      const effectiveHint = ownHint ?? inheritedHint;
-
-      if (reference?.nodes != null) {
+      if (ownHint != null) {
         items.push({
           node: object,
-          role: effectiveHint.role,
+          role: ownHint.role,
           ...(ownHint?.label != null ? { label: ownHint.label } : {}),
         });
       }
 
       for (const child of object.children) {
-        visit(child, effectiveHint);
+        visit(child);
       }
     };
 
     for (const scene of gltf.scenes) {
-      visit(scene, { role: 'always' });
+      visit(scene);
     }
 
-    return new KHRNodeVisibilityHint(items);
+    return new KHRNodeVisibilityHint(items, gltf.scenes);
   }
 }

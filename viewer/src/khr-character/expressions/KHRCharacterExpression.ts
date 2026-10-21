@@ -1,62 +1,43 @@
 import * as THREE from 'three';
-import { type KHRCharacterExpressionManager } from './KHRCharacterExpressionManager.ts';
+import type { KHRCharacterExpressionSuppressionItem } from '../../../../schematypes/KHRCharacterExpressionSuppression.ts';
 
-/** A resolved expression mask, keyed by target expression name at runtime. */
-export interface KHRCharacterExpressionMask {
-  target: string;
-  type?: string;
-  amount?: number;
-  threshold?: number;
+/** Raw suppression metadata; target identity remains its native array index. */
+export type KHRCharacterExpressionSuppression = KHRCharacterExpressionSuppressionItem;
+export type ExpressionCompositionKind = 'additive' | 'quaternion' | 'scale' | 'discrete';
+
+export interface ExpressionBinding {
+  id: string;
+  read(): number[];
+  write(values: readonly number[]): void;
 }
 
-/**
- * Represents a character expression.
- *
- * It is intended to be managed and controlled via {@link KHRCharacterExpressionManager}.
- * It extends `Object3D` so that its {@link weight} can be animated via Three.js animation system.
- */
+export interface ExpressionChannel {
+  channelIndex: number;
+  /** Canonical AOM property. Array elements share their complete-array key. */
+  target: string;
+  components: readonly number[];
+  initial: readonly number[];
+  kind: ExpressionCompositionKind;
+  sample(time: number): number[];
+  bindings: readonly ExpressionBinding[];
+}
+
+/** Native identity is the serialized expression-array index; labels may repeat. */
 export class KHRCharacterExpression extends THREE.Object3D {
-  /**
-   * The name of this expression.
-   * It is distinguished with {@link name} property of {@link THREE.Object3D}.
-   */
   public readonly expressionName: string;
-
-  /**
-   * The current weight of this expression.
-   * You usually want to set the weight via {@link KHRCharacterExpressionManager.getValue}.
-   *
-   * It might also be controlled by the Three.js animation system.
-   */
-  public weight: number;
-
-  /**
-   * Masks authored on this expression that reduce target expression influence.
-   */
-  public masks: KHRCharacterExpressionMask[];
-
-  /**
-   * The animation action for this expression.
-   * It is controlled by {@link KHRCharacterExpressionManager}.
-   */
-  public action?: THREE.AnimationAction;
-
-  /**
-   * Indicates that this is a KHRCharacterExpression.
-   */
+  public readonly index: number;
+  public weight = 0;
+  public duration: number;
+  public channels: ExpressionChannel[] = [];
+  public suppressions: KHRCharacterExpressionSuppression[] = [];
   public readonly isKHRCharacterExpression = true;
 
-  constructor(expressionName: string) {
+  constructor(expressionName: string, index: number, duration = 0) {
     super();
-
-    this.name = `KHRCharacterExpression_${expressionName}`;
     this.expressionName = expressionName;
-
-    this.weight = 0.0;
-    this.masks = [];
-
-    // This is not intended to be visible, we set visible to false for the sake of performance.
-    // It omits the calculation of the matrix every frame.
+    this.index = index;
+    this.duration = duration;
+    this.name = `KHRCharacterExpression_${index}`;
     this.visible = false;
   }
 }

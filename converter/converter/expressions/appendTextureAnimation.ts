@@ -60,7 +60,7 @@ function compileTextureTransformExtPaths(
     const extensions = textureInfo.extensions ??= {};
     if (typeof extensions !== 'object') {
       console.warn(
-        `KHR_character_expression_texture: Texture info at material #${materialIndex} path "${path}" has an invalid \`extensions\` property (not an object). Skipping the path.`,
+        `KHR_character_expression_texture_transform: Texture info at material #${materialIndex} path "${path}" has an invalid \`extensions\` property (not an object). Skipping the path.`,
       );
       continue;
     }
@@ -107,56 +107,35 @@ export function appendTextureAnimation(
     extensionsUsedSet.add('KHR_texture_transform');
   }
 
-  for (const propName of ['offset', 'scale'] as const) {
-    const prop = vrmBind[propName];
-    if (prop == null) {
-      continue;
-    }
-
-    // TODO: We assume default offset and scale, and it's not always true
-    const [x0, y0] = propName === 'offset' ? [0, 0] : [1, 1];
-    const [x1, y1] = prop;
-
-    const [inputIndex, outputIndex] = appendAnimationAccessors(
-      new Float32Array(isBinary ? [0, 0.5, 1] : [0, 1]),
-      transformToBinary(new Float32Array([x0, y0, x1, y1]), isBinary),
-      'VEC2',
-      gltf,
-      binChunkBox,
-    );
-    logVerbose(
-      `KHR_character_expression_texture: New accessors (#${inputIndex}, #${outputIndex})`,
-    );
-
-    const samplerIndex = outAnimation.samplers.length;
-    outAnimation.samplers.push({
-      input: inputIndex,
-      interpolation: isBinary ? 'STEP' : 'LINEAR',
-      output: outputIndex,
-    });
-    samplerIndices.push(samplerIndex);
-
-    for (const extPath of extPaths) {
-      const channelIndex = outAnimation.channels.length;
-
+  for (const extPath of extPaths) {
+    const transform = dig<Record<string, unknown>>(gltf, extPath.slice(1));
+    for (const propName of ['offset', 'scale'] as const) {
+      const endpoint = vrmBind[propName];
+      if (endpoint == null) continue;
+      const neutral = transform?.[propName] as [number, number] | undefined
+        ?? (propName === 'offset' ? [0, 0] : [1, 1]);
+      const [inputIndex, outputIndex] = appendAnimationAccessors(
+        new Float32Array(isBinary ? [0, 0.5, 1] : [0, 1]),
+        transformToBinary(new Float32Array([...neutral, ...endpoint]), isBinary),
+        'VEC2', gltf, binChunkBox,
+      );
+      const samplerIndex = outAnimation.samplers.length;
+      outAnimation.samplers.push({
+        input: inputIndex, output: outputIndex,
+        interpolation: isBinary ? 'STEP' : 'LINEAR',
+      });
+      samplerIndices.push(samplerIndex);
       extensionsUsedSet.add('KHR_animation_pointer');
-
       const pointer = `${extPath}/${propName}`;
+      channelIndices.push(outAnimation.channels.length);
       outAnimation.channels.push({
         sampler: samplerIndex,
         target: {
           path: 'pointer' as any,
-          extensions: {
-            'KHR_animation_pointer': {
-              pointer,
-            },
-          },
+          extensions: { KHR_animation_pointer: { pointer } },
         },
       });
-      channelIndices.push(channelIndex);
-      logVerbose(
-        `KHR_character_expression_texture: New animation channel, pointer for "${pointer}"`,
-      );
+      logVerbose(`KHR_character_expression_texture_transform: New animation channel for "${pointer}"`);
     }
   }
 

@@ -53,10 +53,7 @@ export class KHRCharacterSkeletonLoaderPlugin implements GLTFLoaderPlugin {
           console.warn(`Invalid source node index "${sourceNodeIndex}" for joint "${targetJointName}" in mapping "${targetRigName}".`);
           continue;
         }
-        if (association.name != null && association.name !== json.nodes?.[sourceNodeIndex]?.name) {
-          console.warn(`Source node #${sourceNodeIndex} for joint "${targetJointName}" in mapping "${targetRigName}" is named "${json.nodes?.[sourceNodeIndex]?.name}", not "${association.name}".`);
-          // no need to skip, we can still use the node even if the name doesn't match
-        }
+
 
         const node = await gltf.parser.getDependency('node', sourceNodeIndex);
         targetJointNameToNodeMap.set(targetJointName, node);

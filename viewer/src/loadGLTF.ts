@@ -13,6 +13,7 @@ import { KHRMeshPrimitiveVisibilityHintLoaderPlugin } from './khr-character/mesh
 import type { KHRMeshPrimitiveVisibilityHint } from './khr-character/mesh-primitive-visibility-hint/KHRMeshPrimitiveVisibilityHint';
 import { KHRNodeVisibilityHintLoaderPlugin } from './khr-character/node-visibility-hint/KHRNodeVisibilityHintLoaderPlugin';
 import type { KHRNodeVisibilityHint } from './khr-character/node-visibility-hint/KHRNodeVisibilityHint';
+import { KHRCoreNodeVisibilityLoaderPlugin } from './khr-character/node-visibility-hint/KHRCoreNodeVisibilityLoaderPlugin.ts';
 
 /**
  * Create a GLTFLoader with bunch of KHR_character related plugins registered.
@@ -20,12 +21,15 @@ import type { KHRNodeVisibilityHint } from './khr-character/node-visibility-hint
 function createLoader(): GLTFLoader {
   const loader = new GLTFLoader();
 
-  loader.register((parser) => new GLTFAnimationPointerExtension(parser));
+  loader.register((parser) => new GLTFAnimationPointerExtension(parser).setAnimationPointerResolver({
+    resolvePath: (path) => path.replace(/^(\/nodes\/\d+)\/extensions\/KHR_node_visibility\/visible$/, '$1/visible'),
+  }));
   loader.register((parser) => new KHRCharacterSkeletonLoaderPlugin(parser));
   loader.register((parser) => new KHRCharacterExpressionLoaderPlugin(parser));
   loader.register((parser) => new VRMCCharacterExpressionLookatLoaderPlugin(parser));
   loader.register((parser) => new KHRNodeCameraHintLoaderPlugin(parser));
   loader.register((parser) => new KHRNodeVisibilityHintLoaderPlugin(parser));
+  loader.register((parser) => new KHRCoreNodeVisibilityLoaderPlugin(parser));
   loader.register((parser) => new KHRMeshPrimitiveVisibilityHintLoaderPlugin(parser));
   loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
 

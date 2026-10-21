@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Inspector } from 'three/addons/inspector/Inspector.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import './style.css';
 import sampleGltf from './assets/khr-character-example.glb?url';
 import { VRMAnimation } from '@pixiv/three-vrm-animation';
@@ -15,7 +15,7 @@ import { createKHRCharacterVRMHumanoidRestPose } from './createKHRCharacterVRMHu
 import type { KHRCharacterVRMHumanoidRestPose } from './KHRCharacterVRMHumanoidRestPose';
 import smartphoneVrma from './assets/smartphone.vrma?url';
 import { handleDragAndDrop } from './utils/handleDragAndDrop';
-import type { KHRNodeCameraHint } from './khr-character/camera-hint/KHRNodeCameraHint';
+import { getInitialCameraFrame, type KHRNodeCameraHint } from './khr-character/camera-hint/KHRNodeCameraHint';
 import { KHRNodeCameraHintHelper } from './khr-character/camera-hint/KHRNodeCameraHintHelper';
 import { checkMaxTextureArrayLayers } from './utils/checkMaxTextureArrayLayers';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -39,14 +39,14 @@ const renderer = new WebGPURenderer({
 });
 renderer.setClearColor(0x000000, 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
+await renderer.init();
 
 const css2dRenderer = new CSS2DRenderer({
   element: css2DElement,
 });
 css2dRenderer.setSize(window.innerWidth, window.innerHeight);
 
-const inspector = new Inspector();
-renderer.inspector = inspector;
+const gui = new GUI();
 
 const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
 camera.position.set(0, 1, 3);
@@ -66,7 +66,7 @@ const paramsSkeleton: Record<string, any> = {
   'vrmAnimation': 'none',
   'showHelper': false,
 };
-const guiSkeletons = inspector.createParameters('Skeleton');
+const guiSkeletons = gui.addFolder('Skeleton');
 
 guiSkeletons.add(paramsSkeleton, 'vrmAnimation', [ 'none', 'smartphone' ]).onChange((value) => {
   if (value === 'none') {
@@ -83,21 +83,21 @@ guiSkeletons.add(paramsSkeleton, 'showHelper').onChange(() => {
 
 // == gui for visibility ===========================================================================
 const paramsVisibility = {
-  view: 'third_person' as 'first_person' | 'third_person',
+  view: 'third_person',
 };
-const guiVisibility = inspector.createParameters('Visibility');
-guiVisibility.add(paramsVisibility, 'view', ['first_person', 'third_person']).onChange(() => {
+const guiVisibility = gui.addFolder('Visibility');
+guiVisibility.add(paramsVisibility, 'view', ['first_person', 'third_person', 'both', 'none']).onChange(() => {
   updateVisibility();
 });
 
 // == gui for expressions ==========================================================================
 const paramsExpressions: Record<string, number> = {};
-const guiExpressions = inspector.createParameters('Expressions');
+const guiExpressions = gui.addFolder('Expressions');
 
 const paramsLookat = {
   lookAtMode: 'none' as 'none' | 'camera',
 };
-const guiLookat = inspector.createParameters('Look-at');
+const guiLookat = gui.addFolder('Look-at');
 guiLookat.add(paramsLookat, 'lookAtMode', [ 'none', 'camera' ]).onChange((value) => {
   if (value !== 'none' && currentLookat == null) {
     console.warn('VRMC_character_expression_lookat extension is not available in this model.');
@@ -111,17 +111,15 @@ guiLookat.add(paramsLookat, 'lookAtMode', [ 'none', 'camera' ]).onChange((value)
 });
 
 function setupExpressionsGUI() {
-  // clear existing GUI
-  // Since Inspector doesn't support removing parameters, we'll improvise it
-  for (const param of [...(guiExpressions.paramList as any).children]) {
-    (guiExpressions.paramList as any).remove(param);
-  }
+  for (const controller of guiExpressions.controllersRecursive()) controller.destroy();
+  for (const label of Object.keys(paramsExpressions)) delete paramsExpressions[label];
 
   // add expression parameters to the GUI
   for (const expression of currentExpressionManager?.expressions ?? []) {
-    paramsExpressions[expression.expressionName] = expression.weight;
-    guiExpressions.add(paramsExpressions, expression.expressionName, 0, 1).onChange((value) => {
-      currentExpressionManager?.setValue(expression.expressionName, value);
+    const label = `${expression.expressionName} (${expression.index})`;
+    paramsExpressions[label] = expression.weight;
+    guiExpressions.add(paramsExpressions, label, 0, 1).onChange((value) => {
+      currentExpressionManager?.setValue(expression.index, value);
     });
   }
 }
@@ -130,7 +128,7 @@ function setupExpressionsGUI() {
 const paramsCameraHint = {
   showCameraHint: false,
 };
-const guiCameraHint = inspector.createParameters('Camera Hint');
+const guiCameraHint = gui.addFolder('Camera Hint');
 
 guiCameraHint.add(paramsCameraHint, 'showCameraHint');
 
@@ -155,7 +153,7 @@ function playVRMAnimation() {
   // play new animation, if both character and animation are available
   if (currentVRMAnimation != null) {
     if (currentVRMHumanoidRestPose == null || currentAnimationMixer == null) {
-      console.warn('Unable to play VRM animation. Skeletal rig mapping "vrmHumanoid" is not available in this model.');
+      console.warn('Unable to play VRM animation. Skeletal rig mapping "vrm1_humanoid" is not available in this model.');
       return;
     }
 
@@ -230,25 +228,10 @@ const cameraHintHelper = new KHRNodeCameraHintHelper();
 cameraHintHelper.matrixAutoUpdate = false;
 scene.add(cameraHintHelper);
 
-const _v3CameraHintPosition = new THREE.Vector3();
-const _v3CameraHintTargetPosition = new THREE.Vector3();
-const _v3CameraHintUp = new THREE.Vector3();
-
 function updateCameraHintHelperTransform(hint: KHRNodeCameraHint): void {
-  hint.node.updateWorldMatrix(true, false);
-
-  if (hint.targetNode == null) {
-    cameraHintHelper.matrix.copy(hint.node.matrixWorld);
-  } else {
-    hint.node.getWorldPosition(_v3CameraHintPosition);
-    hint.node.getWorldQuaternion(cameraHintHelper.quaternion);
-    _v3CameraHintUp.set(0, 1, 0).applyQuaternion(cameraHintHelper.quaternion);
-    hint.targetNode.updateWorldMatrix(true, false);
-    hint.targetNode.getWorldPosition(_v3CameraHintTargetPosition);
-    cameraHintHelper.matrix.lookAt(_v3CameraHintPosition, _v3CameraHintTargetPosition, _v3CameraHintUp);
-    cameraHintHelper.matrix.setPosition(_v3CameraHintPosition);
-  }
-
+  const frame = getInitialCameraFrame(hint);
+  if (frame == null) { cameraHintHelper.visible = false; return; }
+  cameraHintHelper.matrix.copy(frame);
   cameraHintHelper.matrixWorldNeedsUpdate = true;
 }
 
@@ -279,6 +262,7 @@ const lookatTarget = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
   timer.update();
   const delta = timer.getDelta();
+  currentExpressionManager?.prepareFrame();
 
   if (currentLookat != null && currentExpressionManager != null) {
     if (paramsLookat.lookAtMode === 'camera') {
@@ -288,11 +272,17 @@ renderer.setAnimationLoop(() => {
     }
   }
 
-  updateCameraHintHelper();
   currentAnimationMixer?.update(delta);
   currentExpressionManager?.update(delta);
-  css2dRenderer.render(scene, camera);
-  renderer.render(scene, camera);
+  updateCameraHintHelper();
+  const tags = paramsVisibility.view === 'both' ? ['first_person', 'third_person']
+    : paramsVisibility.view === 'none' ? [] : [paramsVisibility.view];
+  const render = () => { css2dRenderer.render(scene, camera); renderer.render(scene, camera); };
+  if (currentNodeVisibilityHint) {
+    currentNodeVisibilityHint.withView(tags, render, currentMeshPrimitiveVisibilityHint?.items);
+  } else if (currentMeshPrimitiveVisibilityHint) {
+    currentMeshPrimitiveVisibilityHint.withView(tags, render);
+  } else render();
 });
 
 // == handle dnd ===================================================================================

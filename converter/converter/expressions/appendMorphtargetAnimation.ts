@@ -7,7 +7,7 @@ import { transformToBinary } from './transformToBinary.ts';
 
 /**
  * Builds a 2-keyframe weight buffer for a mesh with morph targets.
- * The first keyframe is all zeros, and the second keyframe applies `weight` only to `targetIndex`.
+ * Neutral matches authored weights; the second key adds the VRM bind to its target.
  *
  * @param targetsLength The total count of morph targets for the mesh
  * @param targetIndex The index of the morph target to apply the weight to
@@ -18,9 +18,13 @@ function createOutputWeights(
   targetsLength: number,
   targetIndex: number,
   weight: number,
+  authored: readonly number[],
 ): Float32Array {
   const weights = new Float32Array(targetsLength * 2);
-  weights[targetsLength + targetIndex] = weight;
+  for (let index = 0; index < targetsLength; index++) {
+    weights[index] = weights[targetsLength + index] = authored[index] ?? 0;
+  }
+  weights[targetsLength + targetIndex] += weight;
   return weights;
 }
 
@@ -60,11 +64,13 @@ export function appendMorphtargetAnimation(
 
   const targetIndex = vrmBind.index;
   const weight = vrmBind.weight;
+  const authored = gltf.nodes?.[nodeIndex]?.weights ?? mesh.weights ?? [];
+  const neutral = authored[targetIndex] ?? 0;
 
   if (options.useAnimationPointerForMorphTarget) {
     const [inputIndex, outputIndex] = appendAnimationAccessors(
       new Float32Array(isBinary ? [0, 0.5, 1] : [0, 1]),
-      new Float32Array(isBinary ? [0, weight, weight] : [0, weight]),
+      new Float32Array(isBinary ? [neutral, neutral + weight, neutral + weight] : [neutral, neutral + weight]),
       'SCALAR',
       gltf,
       binChunkBox,
@@ -96,7 +102,7 @@ export function appendMorphtargetAnimation(
       },
     });
     logVerbose(
-      `KHR_character_expression_texture: New animation channel, pointer for "${pointer}"`,
+      `KHR_character_expression_texture_transform: New animation channel, pointer for "${pointer}"`,
     );
 
     return [samplerIndex, channelIndex];
@@ -105,7 +111,7 @@ export function appendMorphtargetAnimation(
     const [inputIndex, outputIndex] = appendAnimationAccessors(
       new Float32Array(isBinary ? [0, 0.5, 1] : [0, 1]),
       transformToBinary(
-        createOutputWeights(targetsLength, targetIndex, weight),
+        createOutputWeights(targetsLength, targetIndex, weight, authored),
         isBinary,
       ),
       'SCALAR',

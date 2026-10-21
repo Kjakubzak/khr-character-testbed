@@ -2,21 +2,21 @@ import type { GLTFProperty } from './GLTFProperty.ts';
 
 export interface KHRCharacterExpressionMappingExpressionSetMapping {
   /**
-   * Array of source expression mappings that contribute to the target expression.
+   * Entries receiving this external input's contribution.
    */
-  [targetExpression: string]: Array<{
+  [inputKey: string]: Array<GLTFProperty & {
     /**
-     * Index of the source expression in the top-level KHR_character_expression extension object.
+     * Index of the native expression to drive in KHR_character_expression.expressions.
      */
     source: number;
 
     /**
-     * The name of the source expression.
+     * Optional name of this mapping entry, independent of the native expression label.
      */
     name?: string;
 
     /**
-     * Relative influence of this source expression on the target. Weights represent the proportional contribution needed to achieve the desired target result.
+     * Nonnegative contribution coefficient in [0, 1].
      */
     weight: number;
   }>;
@@ -24,17 +24,17 @@ export interface KHRCharacterExpressionMappingExpressionSetMapping {
 
 export interface KHRCharacterExpressionMappingExpressionSetMappings {
   /**
-   * Expression mapping dictionary where each key is a target expression name and each value is an array of source expression mappings.
+   * External vocabulary identifiers, compared exactly without normalization or fetching.
    */
   [expressionSetName: string]: KHRCharacterExpressionMappingExpressionSetMapping;
 }
 
 /**
- * glTF extension that enables encoding multiple expression set mappings, mapping source expressions present in the model to target expressions that a runtime/endpoint understands.
+ * External input keys contribute to native expression drivers through authored weights.
  */
 export interface KHRCharacterExpressionMapping extends GLTFProperty {
   /**
-   * Dictionary of expression set mappings, where each key is a target expression set name.
+   * Nonempty mapping sets. The host chooses a vocabulary and arbitrates other driver sources.
    */
   expressionSetMappings: KHRCharacterExpressionMappingExpressionSetMappings;
 }
