@@ -13,18 +13,24 @@ test('the actual viewer loads and renders its converted sample', async ({ page }
   await page.goto(viewer);
   await expect(page.locator('canvas')).toBeVisible();
   await expect(page.getByText('Expressions', { exact: true }).first()).toBeVisible();
+  // Inspect the renderer without counting text, blue GUI controls or profiler graphs as model pixels.
+  await page.addStyleTag({ content: '#info, #profiler-shell, #css2d-element { visibility: hidden !important; }' });
   let screenshot: Buffer;
+  let counts = { colored: 0, dark: 0 };
   await expect.poll(async () => {
-    screenshot = await page.screenshot({ clip: { x: 100, y: 80, width: 800, height: 700 } });
-    const image = PNG.sync.read(screenshot); let colored = 0;
+    screenshot = await page.screenshot({ clip: { x: 350, y: 80, width: 450, height: 700 } });
+    const image = PNG.sync.read(screenshot); counts = { colored: 0, dark: 0 };
     for (let index = 0; index < image.data.length; index += 4) {
       const rgb = [image.data[index], image.data[index + 1], image.data[index + 2]];
-      if (Math.max(...rgb) > 25 && Math.max(...rgb) - Math.min(...rgb) > 8) colored++;
+      if (Math.max(...rgb) > 25 && Math.max(...rgb) - Math.min(...rgb) > 8) counts.colored++;
+      if (Math.max(...rgb) < 20) counts.dark++;
     }
-    return colored;
-  }, { timeout: 30_000, message: 'the actual sample must produce colored pixels beyond black background and grey controls' }).toBeGreaterThan(500);
+    return counts.dark > 50_000 ? counts.colored : 0;
+  }, { timeout: 30_000, message: 'the actual sample must produce >500 colored pixels on >50,000 dark canvas pixels, with UI overlays hidden' }).toBeGreaterThan(500);
+  expect(counts.dark).toBeGreaterThan(50_000);
   expect(errors).toEqual([]);
   await info.attach('viewer-render.png', { body: screenshot, contentType: 'image/png' });
+  await info.attach('viewer-pixels.json', { body: JSON.stringify(counts), contentType: 'application/json' });
 });
 
 test('real GLB ancestor hints and core Boolean veto change framebuffer without mutating authored state', async ({ page }, info) => {

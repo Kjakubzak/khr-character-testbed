@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Inspector } from 'three/addons/inspector/Inspector.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import './style.css';
 import sampleGltf from './assets/khr-character-example.glb?url';
 import { VRMAnimation } from '@pixiv/three-vrm-animation';
@@ -39,14 +39,14 @@ const renderer = new WebGPURenderer({
 });
 renderer.setClearColor(0x000000, 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
+await renderer.init();
 
 const css2dRenderer = new CSS2DRenderer({
   element: css2DElement,
 });
 css2dRenderer.setSize(window.innerWidth, window.innerHeight);
 
-const inspector = new Inspector();
-renderer.inspector = inspector;
+const gui = new GUI();
 
 const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
 camera.position.set(0, 1, 3);
@@ -66,7 +66,7 @@ const paramsSkeleton: Record<string, any> = {
   'vrmAnimation': 'none',
   'showHelper': false,
 };
-const guiSkeletons = inspector.createParameters('Skeleton');
+const guiSkeletons = gui.addFolder('Skeleton');
 
 guiSkeletons.add(paramsSkeleton, 'vrmAnimation', [ 'none', 'smartphone' ]).onChange((value) => {
   if (value === 'none') {
@@ -85,19 +85,19 @@ guiSkeletons.add(paramsSkeleton, 'showHelper').onChange(() => {
 const paramsVisibility = {
   view: 'third_person',
 };
-const guiVisibility = inspector.createParameters('Visibility');
+const guiVisibility = gui.addFolder('Visibility');
 guiVisibility.add(paramsVisibility, 'view', ['first_person', 'third_person', 'both', 'none']).onChange(() => {
   updateVisibility();
 });
 
 // == gui for expressions ==========================================================================
 const paramsExpressions: Record<string, number> = {};
-const guiExpressions = inspector.createParameters('Expressions');
+const guiExpressions = gui.addFolder('Expressions');
 
 const paramsLookat = {
   lookAtMode: 'none' as 'none' | 'camera',
 };
-const guiLookat = inspector.createParameters('Look-at');
+const guiLookat = gui.addFolder('Look-at');
 guiLookat.add(paramsLookat, 'lookAtMode', [ 'none', 'camera' ]).onChange((value) => {
   if (value !== 'none' && currentLookat == null) {
     console.warn('VRMC_character_expression_lookat extension is not available in this model.');
@@ -111,11 +111,8 @@ guiLookat.add(paramsLookat, 'lookAtMode', [ 'none', 'camera' ]).onChange((value)
 });
 
 function setupExpressionsGUI() {
-  // clear existing GUI
-  // Since Inspector doesn't support removing parameters, we'll improvise it
-  for (const param of [...(guiExpressions.paramList as any).children]) {
-    (guiExpressions.paramList as any).remove(param);
-  }
+  for (const controller of guiExpressions.controllersRecursive()) controller.destroy();
+  for (const label of Object.keys(paramsExpressions)) delete paramsExpressions[label];
 
   // add expression parameters to the GUI
   for (const expression of currentExpressionManager?.expressions ?? []) {
@@ -131,7 +128,7 @@ function setupExpressionsGUI() {
 const paramsCameraHint = {
   showCameraHint: false,
 };
-const guiCameraHint = inspector.createParameters('Camera Hint');
+const guiCameraHint = gui.addFolder('Camera Hint');
 
 guiCameraHint.add(paramsCameraHint, 'showCameraHint');
 
