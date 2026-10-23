@@ -50,10 +50,15 @@ export class KHRCharacterExpressionLoaderPlugin implements GLTFLoaderPlugin {
     const mapping = json.extensions?.['KHR_character_expression_mapping'] as KHRCharacterExpressionMapping | undefined;
     if (mapping != null && (!used.includes('KHR_character_expression_mapping') || mapping.expressionSetMappings == null)) throw new Error('Expression mapping requires the sole expressionSetMappings operation.');
     const manager = new KHRCharacterExpressionManager(gltf, mapping);
+    const firstNames = new Map<string, number>();
+    for (const [index, definition] of root.expressions.entries()) {
+      if (typeof definition.name !== 'string' || definition.name.length === 0) throw new Error('Expression names must be nonempty strings.');
+      if (firstNames.has(definition.name)) throw new Error(`Duplicate native expression name ${JSON.stringify(definition.name)} at entry ${index}; first used at entry ${firstNames.get(definition.name)}.`);
+      firstNames.set(definition.name, index);
+    }
     for (const [index, definition] of root.expressions.entries()) {
       const animation = json.animations?.[definition.animation];
       if (animation == null) throw new Error(`Invalid expression animation index ${definition.animation}`);
-      if (typeof definition.name !== 'string' || definition.name.length === 0) throw new Error('Expression labels must be nonempty strings.');
       // Target uniqueness belongs to each animation, never to distinct entries.
       const targets: string[] = [];
       for (const channel of animation.channels) {

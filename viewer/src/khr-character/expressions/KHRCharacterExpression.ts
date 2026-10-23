@@ -22,7 +22,7 @@ export interface ExpressionChannel {
   bindings: readonly ExpressionBinding[];
 }
 
-/** Native identity is the serialized expression-array index; labels may repeat. */
+/** Native identity is the serialized expression-array index; names are unique within the asset. */
 export class KHRCharacterExpression extends THREE.Object3D {
   public readonly expressionName: string;
   public readonly index: number;

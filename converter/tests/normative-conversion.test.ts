@@ -55,6 +55,29 @@ test('conversion emits current input mapping, expression labels and indexed supp
   assert.ok(Math.abs(values[1] - 1.05) < 1e-6);
 });
 
+test('generated native names reject preset/custom collisions before publishing index bindings', () => {
+  const gltf = fixture(), bin: [Uint8Array] = [new Uint8Array()];
+  gltf.extensions.VRMC_vrm.expressions.custom = {
+    happy: {morphTargetBinds: [{node: 0, index: 1, weight: 0.5}]},
+  };
+  assert.throws(() => appendKHRCharacterExpression(gltf, bin, {}), /Duplicate native expression name "happy"/);
+  assert.equal(gltf.extensions.KHR_character_expression, undefined);
+  assert.equal(gltf.extensions.KHR_character_expression_mapping, undefined);
+});
+
+test('custom names compare exactly and retain separate native indices', () => {
+  const gltf = fixture(), bin: [Uint8Array] = [new Uint8Array()];
+  gltf.extensions.VRMC_vrm.expressions.custom = Object.fromEntries(
+    ['Happy', 'é', 'e\u0301', '__proto__', 'toString'].map(name => [name,
+      {morphTargetBinds: [{node: 0, index: 0, weight: 0.5}]}]),
+  );
+  appendKHRCharacterExpression(gltf, bin, {});
+  const expressions = gltf.extensions.KHR_character_expression.expressions;
+  assert.deepEqual(expressions.map((entry: any) => entry.name), ['happy', 'blink', 'Happy', 'é', 'e\u0301', '__proto__', 'toString']);
+  assert.equal(new Set(expressions.map((entry: any) => entry.name)).size, expressions.length);
+  assert.equal(gltf.extensions.KHR_character_expression_mapping.expressionSetMappings.vrm1_expressions.happy[0].source, 0);
+});
+
 test('standard skeleton identifier is exact and association index remains authoritative', () => {
   const gltf = fixture(); appendKHRCharacterSkeleton(gltf);
   assert.deepEqual(gltf.extensions.KHR_character_skeleton_mapping.skeletalRigMappings.vrm1_humanoid.hips,
