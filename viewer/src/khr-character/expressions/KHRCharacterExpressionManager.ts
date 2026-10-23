@@ -47,20 +47,19 @@ export class KHRCharacterExpressionManager {
   public get expressions(): Set<KHRCharacterExpression> {
     return new Set([...this._expressions.values()].sort((a, b) => a.index - b.index));
   }
-  /** Convenience lookup includes only unique labels; it never assigns identity. */
+  /** Exact asset-local name lookup; serialized identity remains the native index. */
   public get expressionMap(): Map<string, KHRCharacterExpression> {
     const result = new Map<string, KHRCharacterExpression>();
-    const duplicate = new Set<string>();
     for (const e of this.expressions) {
-      if (result.has(e.expressionName)) duplicate.add(e.expressionName);
       result.set(e.expressionName, e);
     }
-    for (const label of duplicate) result.delete(label);
     return result;
   }
   public registerExpression(expression: KHRCharacterExpression): void {
     if (!Number.isInteger(expression.index) || expression.index < 0) throw new Error('Native expression index must be a nonnegative integer.');
     if (this._expressions.has(expression.index)) throw new Error(`Duplicate native expression index ${expression.index}`);
+    if (typeof expression.expressionName !== 'string' || expression.expressionName.length === 0) throw new Error('Native expression names must be nonempty strings.');
+    if (this.expressionMap.has(expression.expressionName)) throw new Error(`Duplicate native expression name ${JSON.stringify(expression.expressionName)}`);
     this._expressions.set(expression.index, expression);
   }
   public unregisterExpression(expression: KHRCharacterExpression): void {
@@ -74,7 +73,7 @@ export class KHRCharacterExpressionManager {
   public setValue(reference: number | string, weight: number): void {
     const value = finiteDriver(weight);
     const expression = this.resolve(reference);
-    if (expression == null) throw new Error(`Unknown or ambiguous native expression: ${reference}`);
+    if (expression == null) throw new Error(`Unknown native expression: ${reference}`);
     expression.weight = value;
   }
   /** Sole mapping equation: clamp each input, sum every authored occurrence, clamp native result. */

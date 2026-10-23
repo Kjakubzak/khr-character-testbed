@@ -2,7 +2,8 @@ import type { GLTFProperty } from './GLTFProperty.ts';
 
 export interface KHRCharacterExpressionExpression extends GLTFProperty {
   /**
-   * Nonempty descriptive label. Expression identity is its array index; labels may repeat.
+   * Nonempty name, unique in the expression array by exact comparison without normalization.
+   * Serialized expression identity remains its array index.
    */
   name: string;
 

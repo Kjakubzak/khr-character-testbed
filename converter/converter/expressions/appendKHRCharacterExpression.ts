@@ -312,9 +312,13 @@ export function appendKHRCharacterExpression(
     return;
   }
 
-  const expressionNameIndexMap = new Map(
-    expressions.map((expression, index) => [expression.name, index]),
-  );
+  // Validate actual generated entries before publishing their payload or index bindings.
+  const expressionNameIndexMap = new Map<string, number>();
+  for (const [index, expression] of expressions.entries()) {
+    if (typeof expression.name !== 'string' || expression.name.length === 0) throw new Error('Native expression names must be nonempty strings.');
+    if (expressionNameIndexMap.has(expression.name)) throw new Error(`Duplicate native expression name ${JSON.stringify(expression.name)} at entry ${index}; first used at entry ${expressionNameIndexMap.get(expression.name)}.`);
+    expressionNameIndexMap.set(expression.name, index);
+  }
   const vrmExpressionsByName = new Map([
     ...Object.entries(vrm.expressions.preset ?? {}),
     ...Object.entries(vrm.expressions.custom ?? {}),

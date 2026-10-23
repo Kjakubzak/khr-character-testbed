@@ -9,7 +9,7 @@ import { createExpressionSampler } from '../src/khr-character/expressions/sample
 
 const close = (actual: number, expected: number) => assert(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 const manager = (mapping?: any) => new KHRCharacterExpressionManager({scene: new THREE.Group()} as GLTF, mapping);
-function add(m: KHRCharacterExpressionManager, index: number, label = 'same') {
+function add(m: KHRCharacterExpressionManager, index: number, label = `expression${index}`) {
   const e = new KHRCharacterExpression(label, index, 2);
   m.registerExpression(e);
   return e;
@@ -34,15 +34,35 @@ async function load(json: any) {
   return loader.parseAsync(JSON.stringify(json), '');
 }
 
-test('native indices retain duplicate labels and refuse ambiguous label resolution', () => {
-  const m = manager(); add(m, 0); add(m, 1);
+test('native names uniquely resolve the same entries as numeric indices', () => {
+  const m = manager(); const first = add(m, 0, 'first'); add(m, 1, 'second');
   assert.equal(m.expressions.size, 2);
-  assert.equal(m.getValue('same'), null);
-  m.setValue(0, 0.2); m.setValue(1, 0.8);
-  assert.equal(m.getValue(0), 0.2); assert.equal(m.getValue(1), 0.8);
-  assert.throws(() => m.setValue('same', 1));
+  m.setValue('first', 0.2); m.setValue(1, 0.8);
+  assert.equal(m.getValue(0), 0.2); assert.equal(m.getValue('second'), 0.8);
+  assert.throws(() => add(m, 2, 'first'), /Duplicate native expression name/);
+  assert.equal(m.expressions.size, 2);
+  assert.throws(() => add(m, 2, ''), /nonempty/);
+  m.unregisterExpression(first);
+  assert.equal(m.getValue('first'), null);
+  add(m, 0, 'first');
+  assert.equal(m.getValue('first'), 0);
   assert.throws(() => m.setValue(0, Infinity));
   assert.throws(() => m.evaluate([NaN, 0]));
+});
+
+test('native name scope is asset-local and compares exact Unicode strings', () => {
+  const m = manager();
+  ['smile', 'Smile', ' smile', 'smile ', 'é', 'e\u0301', '__proto__', 'toString'].forEach((name, index) => add(m, index, name));
+  m.setValue('__proto__', 0.5); assert.equal(m.getValue(6), 0.5);
+  assert.throws(() => add(m, 8, JSON.parse('"\\u0073mile"')), /Duplicate native expression name/);
+  assert.doesNotThrow(() => add(manager(), 0, 'smile'));
+});
+
+test('actual loader rejects duplicates before loading referenced animations', async () => {
+  const json: any = fixture();
+  json.extensions.KHR_character_expression.expressions.push({name: 'same', animation: 999,
+    extensions: {ACME_future_expression: {channels: [0]}}});
+  await assert.rejects(load(json), /Duplicate native expression name "same" at entry 1; first used at entry 0/);
 });
 
 test('sole mapping sums duplicate occurrences, clamps before summing and compares exact IDs', () => {
@@ -175,10 +195,11 @@ test('actual pointer decoding applies normalized values and preserves label/inde
   json.bufferViews.push({buffer: 1, byteLength: values.length});
   json.accessors[1] = {bufferView: 2, componentType: 5121, normalized: true, count: 2, type: 'VEC3'};
   const duplicate = structuredClone(json.extensions.KHR_character_expression.expressions[0]);
+  duplicate.name = 'other';
   json.extensions.KHR_character_expression.expressions.push(duplicate);
   const gltf = await load(json);
   const m = gltf.userData.khrCharacterExpressionManager as KHRCharacterExpressionManager;
-  assert.equal(m.expressions.size, 2); assert.equal(m.getValue('same'), null);
+  assert.equal(m.expressions.size, 2); assert.equal(m.getValue('same'), 0); assert.equal(m.getValue('other'), 0);
   m.setValue(0, 0.5); m.update(); close(gltf.scene.children[0].position.x, 10.5);
   m.setValue(1, 0.5); m.update(); close(gltf.scene.children[0].position.x, 11);
 });
