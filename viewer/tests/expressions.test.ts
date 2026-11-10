@@ -79,15 +79,36 @@ test('sole mapping sums duplicate occurrences, clamps before summing and compare
   close(m.getValue(0)!, 0.6); assert.equal(m.getValue(1), 0);
 });
 
-test('suppression uses immutable inputs, strict block threshold, duplicate products and unknown identity', () => {
+test('suppression sums contributions from immutable inputs, clamps, uses a strict block threshold and adds 0 for custom types', () => {
   const m = manager(); const a = add(m, 0); const b = add(m, 1);
   a.suppressions = [{target: 0, amount: 0.5, threshold: 0}, {target: 1, amount: 0.5}, {target: 1, amount: 0.5}, {target: 1, type: 'ACME_curve', amount: 1}];
   b.suppressions = [{target: 0, type: 'block', amount: 1, threshold: 0.8}];
   const e = m.evaluate([0.5,0.8]);
-  close(e.effectiveDrivers[0], 0.375); close(e.effectiveDrivers[1], 0.45);
+  // Target 0: blend 0.5*0.5 (threshold ignored on blend) + block 0 (0.8 is not > 0.8).
+  close(e.effectiveDrivers[0], 0.375);
+  // Target 1: 0.25 + 0.25 + 0 (unsupported custom type) = 0.5; the old product rule gave 0.45.
+  close(e.effectiveDrivers[1], 0.4);
   const reversed = [...a.suppressions].reverse(); a.suppressions = reversed;
-  close(m.evaluate([0.5,0.8]).effectiveDrivers[1], 0.45);
+  close(m.evaluate([0.5,0.8]).effectiveDrivers[1], 0.4);
+  // Block fires above its threshold: 0.25 + 1 clamps to 1.
   assert.equal(m.evaluate([0.5,0.81]).effectiveDrivers[0], 0);
+});
+
+test('overlapping blend suppressions sum (0.4 + 0.5 leaves 0.1); an added block clamps to 0', () => {
+  const m = manager(); const target = add(m, 0); const s1 = add(m, 1); const s2 = add(m, 2); const s3 = add(m, 3);
+  s1.suppressions = [{target: 0, type: 'blend', amount: 0.4}];
+  s2.suppressions = [{target: 0, type: 'blend', amount: 0.5}];
+  close(m.evaluate([1, 1, 1, 0]).effectiveDrivers[0], 0.1);
+  s3.suppressions = [{target: 0, type: 'block', amount: 1}];
+  assert.equal(m.evaluate([1, 1, 1, 1]).effectiveDrivers[0], 0);
+  assert.equal(target.index, 0);
+});
+
+test('suppression resolves by target index; its name is never used', () => {
+  const m = manager(); add(m, 0, 'blink'); add(m, 1, 'happy'); const source = add(m, 2, 'source');
+  source.suppressions = [{target: 0, name: 'happy', amount: 1}];
+  const e = m.evaluate([1, 1, 1]);
+  assert.equal(e.effectiveDrivers[0], 0); assert.equal(e.effectiveDrivers[1], 1);
 });
 
 test('linear, step and cubic samplers hold endpoints and preserve angle winding', () => {
@@ -142,15 +163,78 @@ test('array and individual-element contributions aggregate together without dupl
   assert.deepEqual(m.evaluate().aggregates[0].value, [1,3]);
 });
 
-test('host scale and quaternion composition selects highest active serialized index', () => {
+const step = (neutral: number[], active: number[]) => (time: number) => time > 0 ? [...active] : [...neutral];
+const quat = (axis: [number, number, number], degrees: number) =>
+  new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis), THREE.MathUtils.degToRad(degrees)).toArray();
+/** Rotation vector (axis * angle) in degrees. */
+function rotationVector(q: readonly number[]): number[] {
+  const quaternion = new THREE.Quaternion().fromArray(q as number[]).normalize();
+  if (quaternion.w < 0) quaternion.set(-quaternion.x, -quaternion.y, -quaternion.z, -quaternion.w);
+  const angle = 2 * Math.acos(Math.min(1, quaternion.w));
+  const s = Math.sqrt(Math.max(0, 1 - quaternion.w * quaternion.w));
+  if (s < 1e-9) return [0, 0, 0];
+  return [quaternion.x / s, quaternion.y / s, quaternion.z / s].map(v => THREE.MathUtils.radToDeg(v * angle));
+}
+
+test('node scale responses compose additively per component (1->2 and 1->3 give 4, not 6)', () => {
   const m = manager(); const b = add(m, 1); const a = add(m, 0);
-  a.channels = [{channelIndex: 0, target: '/nodes/0/scale', components: [0,1,2], initial: [1,1,1], kind: 'scale', sample: () => [2,2,2], bindings: []}];
-  b.channels = [{...a.channels[0], sample: () => [4,4,4]}];
+  a.channels = [{channelIndex: 0, target: '/nodes/0/scale', components: [0,1,2], initial: [1,1,1], kind: 'scale', sample: step([1,1,1], [2,2,2]), bindings: []}];
+  b.channels = [{...a.channels[0], sample: step([1,1,1], [3,3,3])}];
   assert.deepEqual(m.evaluate([1,1]).aggregates[0].value, [4,4,4]);
   assert.deepEqual(m.evaluate([1,0]).aggregates[0].value, [2,2,2]);
-  a.channels.push({channelIndex: 1, target: '/nodes/0/rotation', components: [0,1,2,3], initial: [0,0,0,1], kind: 'quaternion', sample: () => [0,0,0,1], bindings: []});
-  b.channels.push({...a.channels[1], sample: () => [0,0,1,0]});
-  assert.deepEqual(m.evaluate([1,1]).aggregates.find(a => a.target.endsWith('/rotation'))!.value, [0,0,1,0]);
+  const state = [2, 2, 2];
+  a.channels[0] = {...a.channels[0], bindings: [{id: 'scale', read: () => [...state], write: (v: readonly number[]) => { state.splice(0, 3, ...v); }}]};
+  m.setValue(0, 1); m.setValue(1, 0); m.update(); assert.deepEqual(state, [3,3,3]); // live base 2 + (2 - 1)
+  m.setValue(0, 0); m.update(); assert.deepEqual(state, [2,2,2]);
+});
+
+test('texture-transform scale composes additively per component', () => {
+  const m = manager(); const a = add(m, 0); const b = add(m, 1);
+  const target = '/materials/0/pbrMetallicRoughness/baseColorTexture/extensions/KHR_texture_transform/scale';
+  a.channels = [{channelIndex: 0, target, components: [0,1], initial: [0.5,0.5], kind: 'scale', sample: step([0.5,0.5], [0.75,0.75]), bindings: []}];
+  b.channels = [{...a.channels[0], sample: step([0.5,0.5], [0.625,0.625])}];
+  const value = m.evaluate([1,1]).aggregates[0].value;
+  close(value[0], 0.875); close(value[1], 0.875);
+});
+
+test('rotation composition is approximately additive for small rotations', () => {
+  const tolerance = 1; // degrees
+  const m = manager(); const right = add(m, 0); const up = add(m, 1);
+  const identity = [0,0,0,1];
+  right.channels = [{channelIndex: 0, target: '/nodes/0/rotation', components: [0,1,2,3], initial: identity, kind: 'quaternion', sample: step(identity, quat([0,1,0], 10)), bindings: []}];
+  up.channels = [{...right.channels[0], sample: step(identity, quat([1,0,0], 10))}];
+  const both = rotationVector(m.evaluate([1,1]).aggregates[0].value);
+  assert(Math.abs(both[0] - 10) < tolerance && Math.abs(both[1] - 10) < tolerance && Math.abs(both[2]) < tolerance, `10 right + 10 up gave ${both}`);
+  const only = rotationVector(m.evaluate([1,0]).aggregates[0].value);
+  close(only[1], 10); close(only[0], 0);
+  up.channels = [{...right.channels[0]}];
+  const same = rotationVector(m.evaluate([1,1]).aggregates[0].value);
+  assert(Math.abs(same[1] - 20) < tolerance && Math.abs(same[0]) < tolerance && Math.abs(same[2]) < tolerance, `10 + 10 right gave ${same}`);
+  close(same[1], 20);
+});
+
+test('rotation changes are measured from each neutral sample and applied onto the live base', () => {
+  const m = manager(); const a = add(m, 0);
+  const neutral = quat([0,0,1], 30); const active = new THREE.Quaternion().fromArray(quat([0,1,0], 10)).multiply(new THREE.Quaternion().fromArray(neutral)).toArray();
+  const state = [...quat([1,0,0], 45)];
+  a.channels = [{channelIndex: 0, target: '/nodes/0/rotation', components: [0,1,2,3], initial: neutral, kind: 'quaternion', sample: step(neutral, active),
+    bindings: [{id: 'rotation', read: () => [...state], write: (v: readonly number[]) => { state.splice(0, 4, ...v); }}]}];
+  const value = m.evaluate([1]).aggregates[0].value;
+  value.forEach((v, i) => close(v, active[i]));
+  m.setValue(0, 1); m.update();
+  const expected = new THREE.Quaternion().fromArray(quat([0,1,0], 10)).multiply(new THREE.Quaternion().fromArray(quat([1,0,0], 45))).toArray();
+  state.forEach((v, i) => close(v, expected[i]));
+  close(Math.hypot(...state), 1);
+  m.setValue(0, 0); m.update();
+  quat([1,0,0], 45).forEach((v, i) => close(state[i], v));
+});
+
+test('Boolean and integer composition selects the highest active serialized index', () => {
+  const m = manager(); const b = add(m, 1); const a = add(m, 0);
+  a.channels = [{channelIndex: 0, target: '/custom/flag', components: [0], initial: [0], kind: 'discrete', sample: step([0], [1]), bindings: []}];
+  b.channels = [{...a.channels[0], sample: step([0], [2])}];
+  assert.deepEqual(m.evaluate([1,1]).aggregates[0].value, [2]);
+  assert.deepEqual(m.evaluate([1,0]).aggregates[0].value, [1]);
 });
 
 test('actual GLTF loader preserves ordinary clip and samples driver times duration statelessly', async () => {

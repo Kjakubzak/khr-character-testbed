@@ -25,10 +25,23 @@ current wire format.
 - `vrm1_humanoid` and `vrm1_expressions` are exact identifiers. Array and node
   indices identify targets; optional names are independent labels.
 - `expressionSetMappings` maps external inputs to native expression indices.
-  Shared non-additive targets use an explicit viewer composition policy.
-- Suppressions use `KHR_character_expression_suppression`; UV responses use
-  `KHR_character_expression_texture_transform`. Authored morph and UV neutral
-  samples are retained.
+- Suppressions use `KHR_character_expression_suppression`: all attenuation
+  contributions to a target are summed and clamped,
+  `v = u * (1 - clamp(sum, 0, 1))`; `blend` adds `amount * u[source]`, `block`
+  adds `amount` when `u[source] > threshold`, and a custom type adds 0 (no
+  companion extensions are supported). Targets resolve by index; a
+  suppression's `name` is never used.
+- UV responses use `KHR_character_expression_texture_transform`. Authored morph
+  and UV neutral samples are retained.
+- Composition choices for shared targets: translation, morph weights and UV
+  offset/rotation use the required `b + sum(s - n)`. Node scale and UV scale use
+  the same formula per component (recommended by the joint and texture-transform
+  extensions). Node rotation adds each response's change from its own neutral
+  sample, `delta = s * n^-1`, pre-multiplied in ascending entry order; this is
+  approximately additive for small rotations (10 degrees right plus 10 degrees up
+  gives about 10 degrees each; two 10-degree turns about one axis give 20
+  degrees). At runtime the total change is applied onto the live base rotation.
+  Boolean and integer targets use the highest active entry index.
 - Visibility hints carry a `roles` array. A hint allows a view when any
   recognized role applies there (OR); `always`, a standard role the viewer has
   no logic for, or a hint with no recognized role imposes no restriction, and
