@@ -4,6 +4,7 @@ import { appendKHRCharacter } from '../converter/appendKHRCharacter.ts';
 import { appendKHRCharacterExpression } from '../converter/expressions/appendKHRCharacterExpression.ts';
 import { appendKHRCharacterSkeleton } from '../converter/appendKHRCharacterSkeleton.ts';
 import { appendKHRNodeVisibilityHint } from '../converter/appendKHRNodeVisibilityHint.ts';
+import { appendKHRCharacterReferencePose } from '../converter/appendKHRCharacterReferencePose.ts';
 import { appendTextureAnimation } from '../converter/expressions/appendTextureAnimation.ts';
 import { constructGLB } from '../converter/constructGLB.ts';
 import { convertVRMToKHRCharacter } from '../converter/convertVRMToKHRCharacter.ts';
@@ -147,4 +148,38 @@ test('auto visibility writes a roles array and never lists hints in extensionsRe
   const result = convertVRMToKHRCharacter(constructGLB(input, new Uint8Array()));
   assert.deepEqual(result.gltf.extensionsRequired, []);
   assert.ok(result.gltf.extensionsUsed!.includes('KHR_node_visibility_hint'));
+});
+
+test('VRM rest pose is emitted as a t_pose reference pose with one STEP key per humanoid bone node', () => {
+  const gltf = fixture(), bin: [Uint8Array] = [new Uint8Array()];
+  gltf.nodes[1].translation = [0, 1, 0];
+  gltf.nodes.push({ name: 'spine', rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2] }, { name: 'chest', matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1] });
+  gltf.extensions.VRMC_vrm.humanoid.humanBones.spine = { node: 2 };
+  gltf.extensions.VRMC_vrm.humanoid.humanBones.chest = { node: 3 };
+  appendKHRCharacterReferencePose(gltf, bin);
+  const animation = gltf.animations.at(-1);
+  assert.deepEqual(animation.extensions, { KHR_character_reference_pose: { poseType: 't_pose' } });
+  assert.ok(gltf.extensionsUsed.includes('KHR_character_reference_pose'));
+  assert.deepEqual(animation.channels.map((c: any) => [c.target.node, c.target.path]),
+    [[1, 'rotation'], [1, 'translation'], [2, 'rotation'], [2, 'translation']]); // matrix node 3 skipped
+  for (const sampler of animation.samplers) {
+    assert.equal(sampler.interpolation, 'STEP');
+    assert.equal(gltf.accessors[sampler.input].count, 1);
+    assert.equal(gltf.accessors[sampler.output].count, 1);
+  }
+  const value = (i: number) => floats(gltf, bin[0], animation.samplers[i].output);
+  assert.deepEqual(value(0), [0, 0, 0, 1]);
+  assert.deepEqual(value(1), [0, 1, 0]);
+  assert.ok(Math.abs(value(2)[1] - Math.SQRT1_2) < 1e-6);
+  assert.deepEqual(floats(gltf, bin[0], animation.samplers[0].input), [0]);
+  const count = gltf.animations.length;
+  appendKHRCharacterReferencePose(gltf, bin);
+  assert.equal(gltf.animations.length, count); // an existing tagged animation is not duplicated
+});
+
+test('no reference pose is written without a VRM humanoid', () => {
+  const input: any = { asset: { version: '2.0' }, nodes: [{}], scenes: [{ nodes: [0] }] };
+  const result = convertVRMToKHRCharacter(constructGLB(input, new Uint8Array()));
+  assert.equal(result.gltf.animations?.some((a: any) => a.extensions?.KHR_character_reference_pose != null) ?? false, false);
+  assert.equal(result.gltf.extensionsUsed!.includes('KHR_character_reference_pose'), false);
 });

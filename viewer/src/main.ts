@@ -23,6 +23,9 @@ import { KHRCharacterSkeletonMappingHelper } from './KHRCharacterSkeletonMapping
 import type { KHRMeshPrimitiveVisibilityHint } from './khr-character/mesh-primitive-visibility-hint/KHRMeshPrimitiveVisibilityHint';
 import type { KHRNodeVisibilityHint } from './khr-character/node-visibility-hint/KHRNodeVisibilityHint';
 import type { VisibilityRoleOptions } from './khr-character/visibility-hint/isVisibilityHintRoleVisible';
+import type { KHRCharacterReferencePose } from './khr-character/reference-pose/KHRCharacterReferencePose';
+import type { KHRNodeLookatTargetMarker } from './khr-character/lookat-target/KHRNodeLookatTarget';
+import { KHRNodeLookatTargetHelper } from './khr-character/lookat-target/KHRNodeLookatTargetHelper';
 
 // == basic Three.js stuff =========================================================================
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -136,6 +139,33 @@ const guiCameraHint = gui.addFolder('Camera Hint');
 
 guiCameraHint.add(paramsCameraHint, 'showCameraHint');
 
+// == gui for reference pose =======================================================================
+// Preview only: the selected tagged animation's resolved pose is applied while rendering and the
+// live node state is restored afterwards, so ordinary animation and expressions are unaffected.
+const paramsReferencePose = {
+  referencePose: 'none',
+};
+const guiReferencePose = gui.addFolder('Reference Pose');
+const referencePoseByLabel = new Map<string, KHRCharacterReferencePose>();
+
+function setupReferencePoseGUI() {
+  for (const controller of guiReferencePose.controllersRecursive()) controller.destroy();
+  referencePoseByLabel.clear();
+  for (const pose of currentReferencePoses ?? []) {
+    const label = `#${pose.animationIndex} ${pose.poseType}${pose.isStandardPoseType ? '' : ' (custom)'}${pose.animationName != null ? ` "${pose.animationName}"` : ''}`;
+    referencePoseByLabel.set(label, pose);
+  }
+  paramsReferencePose.referencePose = 'none';
+  guiReferencePose.add(paramsReferencePose, 'referencePose', ['none', ...referencePoseByLabel.keys()]);
+}
+
+// == gui for look-at targets ======================================================================
+const paramsLookatTargets = {
+  showLookatTargets: false,
+};
+const guiLookatTargets = gui.addFolder('Look-at Targets');
+guiLookatTargets.add(paramsLookatTargets, 'showLookatTargets');
+
 // == gltf =========================================================================================
 let currentGLTF: GLTF | null = null;
 let currentSkeletonMappingHelper: KHRCharacterSkeletonMappingHelper | null = null;
@@ -147,6 +177,9 @@ let currentAnimationMixer: THREE.AnimationMixer | null = null;
 let currentCameraHints: KHRNodeCameraHint[] | null = null;
 let currentNodeVisibilityHint: KHRNodeVisibilityHint | null = null;
 let currentMeshPrimitiveVisibilityHint: KHRMeshPrimitiveVisibilityHint | null = null;
+let currentReferencePoses: KHRCharacterReferencePose[] | null = null;
+let currentLookatTargets: KHRNodeLookatTargetMarker[] | null = null;
+let currentLookatTargetHelper: KHRNodeLookatTargetHelper | null = null;
 
 function playVRMAnimation() {
   // stop existing animation
@@ -176,6 +209,8 @@ async function handleLoadGLTF(url: string) {
     cameraHints,
     nodeVisibilityHint,
     meshPrimitiveVisibilityHint,
+    referencePoses,
+    lookatTargets,
     vrmAnimations,
   } = await loadGLTF(url);
 
@@ -195,6 +230,12 @@ async function handleLoadGLTF(url: string) {
       currentSkeletonMappingHelper.dispose();
     }
 
+    if (currentLookatTargetHelper != null) {
+      scene.remove(currentLookatTargetHelper);
+      currentLookatTargetHelper.dispose();
+      currentLookatTargetHelper = null;
+    }
+
     // assign new resources
     currentGLTF = gltf;
     currentSkeletonMappingHelper = skeletonMapping != null
@@ -202,8 +243,14 @@ async function handleLoadGLTF(url: string) {
       : null;
     currentExpressionManager = expressionManager ?? null;
     currentLookat = lookat ?? null;
+    currentReferencePoses = referencePoses ?? null;
+    // When the asset tags a t_pose, VRM animation retargeting reads its rest data from that
+    // resolved reference pose instead of the live node state.
+    const tPose = currentReferencePoses?.find((pose) => pose.poseType === 't_pose');
     currentVRMHumanoidRestPose = skeletonMapping != null
-      ? createKHRCharacterVRMHumanoidRestPose(skeletonMapping)
+      ? (tPose != null
+        ? tPose.withPose(() => createKHRCharacterVRMHumanoidRestPose(skeletonMapping))
+        : createKHRCharacterVRMHumanoidRestPose(skeletonMapping))
       : null;
     currentAnimationMixer = currentVRMHumanoidRestPose != null
       ? new THREE.AnimationMixer(gltf.scene)
@@ -211,9 +258,15 @@ async function handleLoadGLTF(url: string) {
     currentCameraHints = cameraHints ?? null;
     currentNodeVisibilityHint = nodeVisibilityHint ?? null;
     currentMeshPrimitiveVisibilityHint = meshPrimitiveVisibilityHint ?? null;
+    currentLookatTargets = lookatTargets ?? null;
+    if (currentLookatTargets != null && currentLookatTargets.length > 0) {
+      currentLookatTargetHelper = new KHRNodeLookatTargetHelper(currentLookatTargets);
+      scene.add(currentLookatTargetHelper);
+    }
 
     // setup GUI
     setupExpressionsGUI();
+    setupReferencePoseGUI();
     updateVisibility();
     updateSkeletonMappingHelperVisibility();
 
@@ -286,7 +339,15 @@ renderer.setAnimationLoop(() => {
   currentExpressionManager?.update(delta);
   updateCameraHintHelper();
   const { tags, options } = getVisibilityView();
-  const render = () => { css2dRenderer.render(scene, camera); renderer.render(scene, camera); };
+  const draw = () => {
+    if (currentLookatTargetHelper != null) {
+      currentLookatTargetHelper.visible = paramsLookatTargets.showLookatTargets;
+      if (currentLookatTargetHelper.visible) currentLookatTargetHelper.update();
+    }
+    css2dRenderer.render(scene, camera); renderer.render(scene, camera);
+  };
+  const pose = referencePoseByLabel.get(paramsReferencePose.referencePose);
+  const render = () => { if (pose != null) pose.withPose(draw); else draw(); };
   if (currentNodeVisibilityHint) {
     currentNodeVisibilityHint.withView(tags, render, currentMeshPrimitiveVisibilityHint?.items, options);
   } else if (currentMeshPrimitiveVisibilityHint) {

@@ -51,6 +51,18 @@ current wire format.
   `no_role_logic` option shows an application without role logic. The hints
   are never written to `extensionsRequired`. Rendering scopes restore authored
   visibility; animation and camera transforms keep updating.
+- Reference poses: every animation tagged with `KHR_character_reference_pose`
+  is validated and exposed with its `poseType` (`t_pose`, `a_pose`, `i_pose` or
+  a custom label) and its resolved per-node values; untargeted nodes and
+  properties use authored values, never the live state. The viewer's
+  "Reference Pose" menu previews a pose while rendering and restores the live
+  state afterwards. When a `t_pose` is tagged, VRM animation retargeting reads
+  its rest data from it. The converter emits a `t_pose` from the VRM rest pose,
+  which VRM 1.0 defines as the VRM T-pose facing +Z.
+- Look-at targets: every `KHR_node_lookat_target` marker is exposed with its
+  optional `hint` and its instances; the target point is each instance's global
+  translation. The viewer's "Look-at Targets" toggle shows them as a debug
+  overlay. Markers have no other effect.
 - Camera hints expose the scale-free global initial frame. `targetNode` does
   not rotate that frame; singular transforms produce no initial pose.
 
@@ -65,11 +77,11 @@ Following extensions are supported in this testbed:
 - [x] [`KHR_character_expression_suppression`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_expression_suppression)
 - [x] [`KHR_character_expression_morphtarget`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_expression_morphtarget)
 - [x] [`KHR_character_expression_texture_transform`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_expression_texture_transform)
-- [ ] [`KHR_character_reference_pose`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_reference_pose)
+- [x] [`KHR_character_reference_pose`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_reference_pose)
 - [x] [`KHR_character_skeleton_mapping`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_character_skeleton_mapping)
 - [x] [`KHR_mesh_primitive_visibility_hint`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_mesh_primitive_visibility_hint)
 - [x] [`KHR_node_camera_hint`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_node_camera_hint)
-- [ ] [`KHR_node_lookat_target`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_node_lookat_target)
+- [x] [`KHR_node_lookat_target`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_node_lookat_target)
 - [x] [`KHR_node_visibility`](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_node_visibility)
 - [x] [`KHR_node_visibility_hint`](https://github.com/Kjakubzak/glTF/tree/7ab5368a87d1d303dff33ec5f9aad42752e84c78/extensions/2.0/Khronos/KHR_node_visibility_hint)
 - [x] [`VRMC_character_expression_lookat`](./provisional/20260319_VRMC_character_expression_lookat/README.md)

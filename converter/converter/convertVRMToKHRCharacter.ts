@@ -1,5 +1,6 @@
 import { appendKHRCharacter } from './appendKHRCharacter.ts';
 import { appendKHRCharacterSkeleton } from './appendKHRCharacterSkeleton.ts';
+import { appendKHRCharacterReferencePose } from './appendKHRCharacterReferencePose.ts';
 import { appendKHRNodeCameraHint } from './appendKHRNodeCameraHint.ts';
 import { appendKHRNodeVisibilityHint } from './appendKHRNodeVisibilityHint.ts';
 import { appendKHRXmpJsonLd } from './appendKHRXmpJsonLd.ts';
@@ -48,6 +49,7 @@ export function convertVRMToKHRCharacter(
   appendKHRCharacterExpression(gltf, binChunkBox, nodeBoneMap);
   appendVRMCCharacterExpressionLookat(gltf, nodeBoneMap);
   appendKHRNodeCameraHint(gltf, nodeBoneMap);
+  appendKHRCharacterReferencePose(gltf, binChunkBox);
   if (options.autoVisibility === true) {
     appendKHRNodeVisibilityHint(gltf, ['Face', 'Hair']);
   }
