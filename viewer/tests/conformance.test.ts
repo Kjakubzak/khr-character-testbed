@@ -32,6 +32,7 @@ const EXPECTED_SKIPS: Record<string, Record<string, string>> = {
 (globalThis as any).ProgressEvent ??= class ProgressEvent extends Event {
   constructor(type: string, options: object = {}) { super(type); Object.assign(this, options); }
 };
+(globalThis as any).self ??= globalThis; // GLTFLoader reads self.URL for embedded images
 (globalThis as any).createImageBitmap ??= async () => ({ width: 1, height: 1, close() {} });
 const blobs = new Map<string, Blob>();
 let blobCount = 0;
