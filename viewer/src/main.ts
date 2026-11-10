@@ -22,6 +22,7 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { KHRCharacterSkeletonMappingHelper } from './KHRCharacterSkeletonMappingHelper';
 import type { KHRMeshPrimitiveVisibilityHint } from './khr-character/mesh-primitive-visibility-hint/KHRMeshPrimitiveVisibilityHint';
 import type { KHRNodeVisibilityHint } from './khr-character/node-visibility-hint/KHRNodeVisibilityHint';
+import type { VisibilityRoleOptions } from './khr-character/visibility-hint/isVisibilityHintRoleVisible';
 
 // == basic Three.js stuff =========================================================================
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -86,7 +87,10 @@ const paramsVisibility = {
   view: 'third_person',
 };
 const guiVisibility = gui.addFolder('Visibility');
-guiVisibility.add(paramsVisibility, 'view', ['first_person', 'third_person', 'both', 'none']).onChange(() => {
+// The viewer's role logic: first-person view applies `first_person`, every other
+// view applies `third_person`. `no_role_logic` models an application without
+// visibility-role logic, where every standard role applies in every view.
+guiVisibility.add(paramsVisibility, 'view', ['third_person', 'first_person', 'no_role_logic']).onChange(() => {
   updateVisibility();
 });
 
@@ -247,9 +251,15 @@ function updateCameraHintHelper() {
   updateCameraHintHelperTransform(hint);
 }
 
+function getVisibilityView(): { tags: string[]; options: VisibilityRoleOptions } {
+  if (paramsVisibility.view === 'no_role_logic') return { tags: [], options: { standardRolesWithLogic: [] } };
+  return { tags: [paramsVisibility.view], options: {} };
+}
+
 function updateVisibility() {
-  currentNodeVisibilityHint?.setView(paramsVisibility.view);
-  currentMeshPrimitiveVisibilityHint?.setView(paramsVisibility.view);
+  const { tags } = getVisibilityView();
+  currentNodeVisibilityHint?.setView(tags);
+  currentMeshPrimitiveVisibilityHint?.setView(tags);
 }
 
 function updateSkeletonMappingHelperVisibility() {
@@ -275,13 +285,12 @@ renderer.setAnimationLoop(() => {
   currentAnimationMixer?.update(delta);
   currentExpressionManager?.update(delta);
   updateCameraHintHelper();
-  const tags = paramsVisibility.view === 'both' ? ['first_person', 'third_person']
-    : paramsVisibility.view === 'none' ? [] : [paramsVisibility.view];
+  const { tags, options } = getVisibilityView();
   const render = () => { css2dRenderer.render(scene, camera); renderer.render(scene, camera); };
   if (currentNodeVisibilityHint) {
-    currentNodeVisibilityHint.withView(tags, render, currentMeshPrimitiveVisibilityHint?.items);
+    currentNodeVisibilityHint.withView(tags, render, currentMeshPrimitiveVisibilityHint?.items, options);
   } else if (currentMeshPrimitiveVisibilityHint) {
-    currentMeshPrimitiveVisibilityHint.withView(tags, render);
+    currentMeshPrimitiveVisibilityHint.withView(tags, render, options);
   } else render();
 });
 

@@ -8,6 +8,7 @@ import {
 import type { GLTF as GLTFSchema } from '@gltf-transform/core';
 import type { KHRNodeVisibilityHint as KHRNodeVisibilityHintSchema } from '../../../../schematypes/KHRNodeVisibilityHint.ts';
 import { KHRNodeVisibilityHint } from './KHRNodeVisibilityHint.ts';
+import { parseVisibilityHintRoles, warnIfVisibilityHintRequired } from '../visibility-hint/parseVisibilityHintRoles.ts';
 import type { KHRNodeVisibilityHintItem } from './KHRNodeVisibilityHintItem.ts';
 
 const EXTENSION_NAME = 'KHR_node_visibility_hint';
@@ -17,7 +18,7 @@ interface GLTFNodeReference extends GLTFReference {
 }
 
 interface ParsedVisibilityHint {
-  role: string;
+  roles: string[];
   label?: string;
 }
 
@@ -43,15 +44,21 @@ export class KHRNodeVisibilityHintLoaderPlugin
     if (!json.extensionsUsed?.includes(EXTENSION_NAME)) {
       return null;
     }
+    warnIfVisibilityHintRequired(json, EXTENSION_NAME);
 
-    const hints = (json.nodes ?? []).map((nodeDef): ParsedVisibilityHint | undefined => {
+    const hints = (json.nodes ?? []).map((nodeDef, nodeIndex): ParsedVisibilityHint | undefined => {
       const extension = nodeDef.extensions?.[EXTENSION_NAME] as KHRNodeVisibilityHintSchema | undefined;
       if (extension == null) {
         return undefined;
       }
 
+      const roles = parseVisibilityHintRoles(extension, `${EXTENSION_NAME} on node #${nodeIndex}`);
+      if (roles == null) {
+        return undefined;
+      }
+
       return {
-        role: extension.role,
+        roles,
         label: extension.label,
       };
     });
@@ -64,7 +71,7 @@ export class KHRNodeVisibilityHintLoaderPlugin
       if (ownHint != null) {
         items.push({
           node: object,
-          role: ownHint.role,
+          roles: ownHint.roles,
           ...(ownHint?.label != null ? { label: ownHint.label } : {}),
         });
       }

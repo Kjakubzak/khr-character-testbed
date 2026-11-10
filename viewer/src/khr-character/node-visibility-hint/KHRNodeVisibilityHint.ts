@@ -19,7 +19,7 @@ export class KHRNodeVisibilityHint {
   public isHintVisible(node: THREE.Object3D, view: ViewTags, options: VisibilityRoleOptions = {}): boolean {
     const tags = new Set(typeof view === 'string' ? [view] : view);
     for (let current: THREE.Object3D | null = node; current != null; current = current.parent) {
-      if (!isVisibilityHintRoleVisible(this.entries.get(current)?.role, tags, options)) return false;
+      if (!isVisibilityHintRoleVisible(this.entries.get(current)?.roles, tags, options)) return false;
       if (this.roots.has(current)) break;
     }
     return true;
@@ -38,7 +38,7 @@ export class KHRNodeVisibilityHint {
 
   public withView<T>(view: ViewTags, render: () => T, primitiveItems: readonly VisualHintItem[] = [], options: VisibilityRoleOptions = {}): T {
     const tags = new Set(typeof view === 'string' ? [view] : view);
-    return withVisibilityForView(this.items.map((item) => ({ object: item.node, role: item.role })),
+    return withVisibilityForView(this.items.map((item) => ({ object: item.node, roles: item.roles })),
       primitiveItems, (node) => this.isHintVisible(node, tags, options), tags, render, options);
   }
 }

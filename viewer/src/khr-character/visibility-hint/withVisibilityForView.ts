@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 import { isVisibilityHintRoleVisible, type ViewTags, type VisibilityRoleOptions } from './isVisibilityHintRoleVisible.ts';
 
-export interface VisualHintItem { object: THREE.Object3D; role: string; }
+export interface VisualHintItem { object: THREE.Object3D; roles: readonly string[]; }
 const scopes = new Map<THREE.Object3D, { authoredVisible: boolean; depth: number }>();
 
 /** Read actual Boolean visibility even while another view is inside a temporary render scope. */
@@ -18,7 +18,7 @@ export function withVisibilityForView<T>(
   const tags = new Set(typeof view === 'string' ? [view] : view);
   const saved = new Map<THREE.Object3D, boolean>();
   for (const item of [...nodeItems, ...primitiveItems]) saved.set(item.object, item.object.visible);
-  const primitiveRoles = new Map(primitiveItems.map((item) => [item.object, item.role]));
+  const primitiveRoles = new Map(primitiveItems.map((item) => [item.object, item.roles]));
   const effective = new Map<THREE.Object3D, boolean>();
   for (const [object] of saved) {
     effective.set(object, getAuthoredVisibility(object) && hintVisible(object)

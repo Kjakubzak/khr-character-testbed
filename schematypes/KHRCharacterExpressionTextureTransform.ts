@@ -1,11 +1,12 @@
 import type { GLTFProperty } from './GLTFProperty.ts';
 
 /**
- * glTF extension that extends KHR_character_expression to specify texture-based expression animations.
+ * Classifies listed expression-animation channels as KHR_texture_transform
+ * property channels (offset, scale or rotation through KHR_animation_pointer).
  */
 export interface KHRCharacterExpressionTextureTransform extends GLTFProperty {
   /**
-   * Array of animation channel indices that drive texture-based expressions.
+   * Nonempty array of unique channel indices in the entry's animation.
    */
   channels: number[];
 }
