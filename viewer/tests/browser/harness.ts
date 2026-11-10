@@ -21,12 +21,11 @@ function render(view: string[], drivers = [0, 0], coreVisible = false, custom = 
   loaded.expressionManager!.update(0);
   const before = [] as boolean[];
   loaded.gltf.scene.traverse((object) => before.push(object.visible));
-  loaded.nodeVisibilityHint!.withView(view, () => {
+  // The harness recognizes the custom role ACME_preview; `custom` makes it apply in this view.
+  loaded.nodeVisibilityHint!.withView(custom ? [...view, 'ACME_preview'] : view, () => {
     renderer.setRenderTarget(target); renderer.render(scene, camera);
     renderer.setRenderTarget(null); renderer.render(scene, camera);
-  }, loaded.meshPrimitiveVisibilityHint?.items ?? [], custom ? {
-    resolveCustomRole: (role) => role === 'ACME_preview',
-  } : {});
+  }, loaded.meshPrimitiveVisibilityHint?.items ?? [], { recognizedCustomRoles: ['ACME_preview'] });
   const pixels = new Uint8Array(256 * 256 * 4); renderer.readRenderTargetPixels(target, 0, 0, 256, 256, pixels);
   let redPixels = 0, greenPixels = 0, sumX = 0;
   for (let index = 0; index < pixels.length; index += 4) {

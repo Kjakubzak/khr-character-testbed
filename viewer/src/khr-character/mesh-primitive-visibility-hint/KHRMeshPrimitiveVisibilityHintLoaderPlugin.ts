@@ -8,6 +8,7 @@ import {
 import type { GLTF as GLTFSchema } from '@gltf-transform/core';
 import type { KHRMeshPrimitiveVisibilityHint as KHRMeshPrimitiveVisibilityHintSchema } from '../../../../schematypes/KHRMeshPrimitiveVisibilityHint.ts';
 import { KHRMeshPrimitiveVisibilityHint } from './KHRMeshPrimitiveVisibilityHint.ts';
+import { parseVisibilityHintRoles, warnIfVisibilityHintRequired } from '../visibility-hint/parseVisibilityHintRoles.ts';
 import type { KHRMeshPrimitiveVisibilityHintItem } from './KHRMeshPrimitiveVisibilityHintItem.ts';
 
 const EXTENSION_NAME = 'KHR_mesh_primitive_visibility_hint';
@@ -42,8 +43,10 @@ export class KHRMeshPrimitiveVisibilityHintLoaderPlugin
     if (!json.extensionsUsed?.includes(EXTENSION_NAME)) {
       return null;
     }
+    warnIfVisibilityHintRequired(json, EXTENSION_NAME);
 
     const items: KHRMeshPrimitiveVisibilityHintItem[] = [];
+    const parsed = new Map<string, string[] | undefined>();
 
     for (const scene of gltf.scenes) {
       scene.traverse((object: THREE.Object3D) => {
@@ -58,9 +61,19 @@ export class KHRMeshPrimitiveVisibilityHintLoaderPlugin
           return;
         }
 
+        // Parse once per primitive definition so a malformed hint warns once, not once per instance.
+        const key = `${reference.meshes}/${reference.primitives}`;
+        if (!parsed.has(key)) {
+          parsed.set(key, parseVisibilityHintRoles(extension, `${EXTENSION_NAME} on mesh #${reference.meshes} primitive #${reference.primitives}`));
+        }
+        const roles = parsed.get(key);
+        if (roles == null) {
+          return;
+        }
+
         items.push({
           object,
-          role: extension.role,
+          roles,
           label: extension.label,
         });
       });

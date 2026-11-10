@@ -1,17 +1,23 @@
 import type { GLTFProperty } from './GLTFProperty.ts';
+import type { KHRVisibilityHintStandardRole } from './KHRNodeVisibilityHint.ts';
 
 /**
- * Adds a local primitive predicate, ANDed with cumulative node hints and actual
- * Boolean visibility. It cannot reopen an ancestor-hidden primitive.
+ * Associates one mesh primitive, in every instance of the mesh, with one or
+ * more visibility roles. Not inherited. It adds a restriction (AND) to the
+ * containing node's ancestor-inclusive hints and KHR_node_visibility; it
+ * cannot reopen content they hide. This extension MUST NOT be listed in
+ * `extensionsRequired`.
  */
 export interface KHRMeshPrimitiveVisibilityHint extends GLTFProperty {
   /**
-   * The view context in which this primitive is visible. Standard vocabulary values ('always', 'first_person', 'third_person') provide interoperability guarantees; custom, vendor-prefixed values are permitted for domain-specific view contexts.
+   * One or more distinct nonempty roles, with the same rules as
+   * KHR_node_visibility_hint.roles.
    */
-  role: string;
+  roles: (KHRVisibilityHintStandardRole | (string & {}))[];
 
   /**
-   * Human-readable label for this visibility annotation. Used for UI display in authoring tools and inspectors.
+   * Nonempty human-readable label, preferred over the roles when presenting
+   * the hint to a user. It has no effect on visibility.
    */
   label?: string;
 }

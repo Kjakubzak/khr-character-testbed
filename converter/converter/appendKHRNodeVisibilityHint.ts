@@ -7,7 +7,8 @@ const EXTENSION_NAME = 'KHR_node_visibility_hint';
 /**
  * Appends `KHR_node_visibility_hint` to nodes with the specified names.
  *
- * When a node has a mesh and its name is in `thirdPersonNodeNames`, this function adds `KHR_node_visibility_hint` to the node with `role: "third_person"`.
+ * When a node has a mesh and its name is in `thirdPersonNodeNames`, this function adds `KHR_node_visibility_hint` to the node with `roles: ["third_person"]`.
+ * The extension is only listed in `extensionsUsed`; it MUST NOT be listed in `extensionsRequired`.
  *
  * @param gltf - The glTF object to modify.
  * @param thirdPersonNodeNames - The names of the nodes to which the extension should be applied.
@@ -34,11 +35,11 @@ export function appendKHRNodeVisibilityHint(
         logVerbose(`${EXTENSION_NAME}: Node #${nodeIndex} ("${node.name}") already has ${EXTENSION_NAME}, skipping`);
       } else {
         node.extensions[EXTENSION_NAME] = {
-          role: 'third_person',
+          roles: ['third_person'],
         } satisfies KHRNodeVisibilityHint;
         isExtensionUsed = true;
 
-        logVerbose(`${EXTENSION_NAME}: Setting "role": "third_person" to node #${nodeIndex} ("${node.name}")`);
+        logVerbose(`${EXTENSION_NAME}: Setting "roles": ["third_person"] to node #${nodeIndex} ("${node.name}")`);
       }
     }
   }

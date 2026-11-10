@@ -57,7 +57,9 @@ export function convertVRMToKHRCharacter(
   const retired = new Set(['KHR_character_expression_mask', 'KHR_character_expression_texture']);
   const retain = (name: string) => !retired.has(name) || present.has(name);
   gltf.extensionsUsed = gltf.extensionsUsed?.filter(retain);
-  gltf.extensionsRequired = gltf.extensionsRequired?.filter(retain);
+  // Visibility hints are advisory and MUST NOT be listed in extensionsRequired.
+  const neverRequired = new Set(['KHR_node_visibility_hint', 'KHR_mesh_primitive_visibility_hint']);
+  gltf.extensionsRequired = gltf.extensionsRequired?.filter((name) => retain(name) && !neverRequired.has(name));
   gltf.extensionsUsed = [...new Set(gltf.extensionsUsed)];
   if (gltf.extensionsRequired) gltf.extensionsRequired = [...new Set(gltf.extensionsRequired)];
 

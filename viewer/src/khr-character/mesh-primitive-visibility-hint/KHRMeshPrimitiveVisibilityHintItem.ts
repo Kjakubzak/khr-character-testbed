@@ -2,6 +2,6 @@ import type * as THREE from 'three';
 
 export interface KHRMeshPrimitiveVisibilityHintItem {
   object: THREE.Object3D;
-  role: string;
+  roles: readonly string[];
   label?: string;
 }

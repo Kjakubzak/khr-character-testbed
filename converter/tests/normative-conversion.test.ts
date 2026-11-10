@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { appendKHRCharacter } from '../converter/appendKHRCharacter.ts';
 import { appendKHRCharacterExpression } from '../converter/expressions/appendKHRCharacterExpression.ts';
 import { appendKHRCharacterSkeleton } from '../converter/appendKHRCharacterSkeleton.ts';
+import { appendKHRNodeVisibilityHint } from '../converter/appendKHRNodeVisibilityHint.ts';
 import { appendTextureAnimation } from '../converter/expressions/appendTextureAnimation.ts';
 import { constructGLB } from '../converter/constructGLB.ts';
 import { convertVRMToKHRCharacter } from '../converter/convertVRMToKHRCharacter.ts';
@@ -130,4 +131,20 @@ test('custom-only regeneration removes prior mappings to the replaced native arr
   assert.equal(gltf.extensions.KHR_character_expression_mapping,undefined);
   assert.equal(gltf.extensionsUsed.includes('KHR_character_expression_mapping'),false);
   assert.equal(gltf.extensionsRequired.includes('KHR_character_expression_mapping'),false);
+});
+
+test('auto visibility writes a roles array and never lists hints in extensionsRequired', () => {
+  const gltf = fixture();
+  gltf.nodes[0].name = 'Face';
+  appendKHRNodeVisibilityHint(gltf, ['Face', 'Hair']);
+  assert.deepEqual(gltf.nodes[0].extensions.KHR_node_visibility_hint, { roles: ['third_person'] });
+  assert.equal('role' in gltf.nodes[0].extensions.KHR_node_visibility_hint, false);
+  assert.ok(gltf.extensionsUsed.includes('KHR_node_visibility_hint'));
+  assert.equal(gltf.extensionsRequired, undefined);
+  const input: any = { asset: { version: '2.0' }, nodes: [{}], scenes: [{ nodes: [0] }],
+    extensionsUsed: ['KHR_node_visibility_hint', 'KHR_mesh_primitive_visibility_hint'],
+    extensionsRequired: ['KHR_node_visibility_hint', 'KHR_mesh_primitive_visibility_hint'] };
+  const result = convertVRMToKHRCharacter(constructGLB(input, new Uint8Array()));
+  assert.deepEqual(result.gltf.extensionsRequired, []);
+  assert.ok(result.gltf.extensionsUsed!.includes('KHR_node_visibility_hint'));
 });
