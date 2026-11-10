@@ -66,7 +66,7 @@ jobs:
 
   browser-test:
     needs: [build-viewer, build-converter]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright 1.58.2 cannot install Chromium on ubuntu-latest (26.04)
     steps:
       - name: Checkout
         uses: actions/checkout@v6
