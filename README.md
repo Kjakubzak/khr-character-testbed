@@ -89,7 +89,11 @@ Following extensions are supported in this testbed:
 ## Local checks
 
 Use Node 22.23 or later. In each of `converter` and `viewer`, run `npm ci`,
-`npm test`, and `npm run build`. The converter also provides `npm run check`.
+`npm test`, and `npm run build`. The viewer tests include the shared KHR_character
+conformance fixtures, vendored in `viewer/tests/fixtures/conformance/` from
+`Kjakubzak/khr_character_testbed` at the commit and SHA-256 hashes recorded in
+its `SOURCE.json`; refresh them with
+`python3 viewer/tests/fixtures/fetch-conformance-fixtures.py <commit>`. The converter also provides `npm run check`.
 Run `npm run dev` in either directory for its local UI. CI runs these checks on
 branches and pull requests; Pages deploys only after a push to `main`.
 
