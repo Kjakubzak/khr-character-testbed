@@ -45,7 +45,7 @@ function appendBufferView(
  * @param binChunkBox The reference box to the binary chunk
  * @returns The newly created input accessor index
  */
-function appendInputAccessor(
+export function appendInputAccessor(
   data: Float32Array,
   gltf: GLTF.IGLTF,
   binChunkBox: [Uint8Array],
@@ -76,7 +76,7 @@ function appendInputAccessor(
  * @param binChunkBox The reference box to the binary chunk
  * @returns The newly created output accessor index
  */
-function appendOutputAccessor(
+export function appendOutputAccessor(
   data: Float32Array,
   type: 'SCALAR' | 'VEC2' | 'VEC3' | 'VEC4',
   gltf: GLTF.IGLTF,

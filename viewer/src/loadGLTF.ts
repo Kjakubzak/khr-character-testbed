@@ -14,6 +14,10 @@ import type { KHRMeshPrimitiveVisibilityHint } from './khr-character/mesh-primit
 import { KHRNodeVisibilityHintLoaderPlugin } from './khr-character/node-visibility-hint/KHRNodeVisibilityHintLoaderPlugin';
 import type { KHRNodeVisibilityHint } from './khr-character/node-visibility-hint/KHRNodeVisibilityHint';
 import { KHRCoreNodeVisibilityLoaderPlugin } from './khr-character/node-visibility-hint/KHRCoreNodeVisibilityLoaderPlugin.ts';
+import { KHRCharacterReferencePoseLoaderPlugin } from './khr-character/reference-pose/KHRCharacterReferencePoseLoaderPlugin.ts';
+import type { KHRCharacterReferencePose } from './khr-character/reference-pose/KHRCharacterReferencePose.ts';
+import { KHRNodeLookatTargetLoaderPlugin } from './khr-character/lookat-target/KHRNodeLookatTargetLoaderPlugin.ts';
+import type { KHRNodeLookatTargetMarker } from './khr-character/lookat-target/KHRNodeLookatTarget.ts';
 
 /**
  * Create a GLTFLoader with bunch of KHR_character related plugins registered.
@@ -31,6 +35,8 @@ function createLoader(): GLTFLoader {
   loader.register((parser) => new KHRNodeVisibilityHintLoaderPlugin(parser));
   loader.register((parser) => new KHRCoreNodeVisibilityLoaderPlugin(parser));
   loader.register((parser) => new KHRMeshPrimitiveVisibilityHintLoaderPlugin(parser));
+  loader.register((parser) => new KHRCharacterReferencePoseLoaderPlugin(parser));
+  loader.register((parser) => new KHRNodeLookatTargetLoaderPlugin(parser));
   loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
 
   return loader;
@@ -51,6 +57,8 @@ export async function loadGLTF(url: string): Promise<{
   cameraHints: KHRNodeCameraHint[] | undefined;
   nodeVisibilityHint: KHRNodeVisibilityHint | undefined;
   meshPrimitiveVisibilityHint: KHRMeshPrimitiveVisibilityHint | undefined;
+  referencePoses: KHRCharacterReferencePose[] | undefined;
+  lookatTargets: KHRNodeLookatTargetMarker[] | undefined;
   vrmAnimations: VRMAnimation[] | undefined;
 }> {
   const loader = createLoader();
@@ -63,6 +71,8 @@ export async function loadGLTF(url: string): Promise<{
   const cameraHints = gltf.userData.khrNodeCameraHints as KHRNodeCameraHint[] | undefined;
   const nodeVisibilityHint = gltf.userData.khrNodeVisibilityHint as KHRNodeVisibilityHint | undefined;
   const meshPrimitiveVisibilityHint = gltf.userData.khrMeshPrimitiveVisibilityHint as KHRMeshPrimitiveVisibilityHint | undefined;
+  const referencePoses = (gltf.userData.khrCharacterReferencePoses ?? undefined) as KHRCharacterReferencePose[] | undefined;
+  const lookatTargets = (gltf.userData.khrNodeLookatTargets ?? undefined) as KHRNodeLookatTargetMarker[] | undefined;
 
   const vrmAnimations = gltf.userData.vrmAnimations as VRMAnimation[] | undefined;
 
@@ -74,6 +84,8 @@ export async function loadGLTF(url: string): Promise<{
     cameraHints,
     nodeVisibilityHint,
     meshPrimitiveVisibilityHint,
+    referencePoses,
+    lookatTargets,
     vrmAnimations,
   };
 }

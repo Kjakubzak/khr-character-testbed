@@ -21,6 +21,11 @@ The module API only depends on standard JavaScript binary APIs for input and
 output, so it can be used from browser build tools as well as Deno. It accepts
 `ArrayBuffer` or `Uint8Array` and returns the converted GLB as `Uint8Array`.
 
+The output also carries a `KHR_character_reference_pose` animation labeled
+`t_pose`: one STEP key per humanoid bone node holding its authored rotation and
+translation, because VRM 1.0 requires the rest pose to be the VRM T-pose. It is
+skipped when the input has no VRM humanoid or already has a tagged animation.
+
 ## Web UI
 
 ```bash
